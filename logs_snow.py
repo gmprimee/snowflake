@@ -50,16 +50,13 @@ def naemon_log():
                 host=data[0]
                 service="Host check"
                 data=";".join(data[1:])
-                #host=data_line[0].split(";")[0]
-                #service="host"
-                #data=";".join(data_line[0].split(";")[1:10])
-             #   print(epoch," ".join(status),host, service, data)
+                print(epoch," ".join(status),host, service, data)
             elif status[0] == 'SERVICE' or status[1] == 'SERVICE':
                 data=":".join(data_line).split(";")
                 host=data[0]
                 service=data[1]
                 data=";".join(data[2:])
-             #   print(epoch," ".join(status), host, service, data)
+                print(epoch," ".join(status), host, service, data)
         else:
             print (status)
 

@@ -42,10 +42,26 @@ def naemon_log():
     nlog=open("naemon.log","r")
     for row in nlog:
         epoch = row.split("]")[0].replace("[","")
-        state = row.split(" ")[1:4]
-        if state[1].isupper() and state[2].isupper():
-            print(state)
-
+        status = row.split(":")[0].split(" ")[1:]
+        data_line=row.split(":")[1:10]
+        if status[0].isupper() and status[1].isupper():
+            if  status[0] == 'HOST' or status[1] == 'HOST':
+                data=":".join(data_line).split(";")
+                host=data[0]
+                service="Host check"
+                data=";".join(data[1:])
+                #host=data_line[0].split(";")[0]
+                #service="host"
+                #data=";".join(data_line[0].split(";")[1:10])
+             #   print(epoch," ".join(status),host, service, data)
+            elif status[0] == 'SERVICE' or status[1] == 'SERVICE':
+                data=":".join(data_line).split(";")
+                host=data[0]
+                service=data[1]
+                data=";".join(data[2:])
+             #   print(epoch," ".join(status), host, service, data)
+        else:
+            print (status)
 
 # Read and format notifications.log file
 # def notifications_log():

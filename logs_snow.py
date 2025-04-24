@@ -4,13 +4,12 @@ import os
 import socket
 import snowflake.connector as sc
 import re
+from datetime import datetime,date
 
 # Variables for Snowflake connection
 #
-nldc1_naemon_log_file = "nldc1_naemon.log"
-segum_naemon_log_file = "segum_naemon.log"
-nldc1_notifications_log_file = "nldc1_notifications.log"
-segum_notifications_log_file = "segum_notifications.log"
+naemon_log_file = "naemon.log"
+notifications_log_file = "notifications.log"
 private_key_file='/home/gradmin/.ssh/snowflake_rsa_key.p8'
 conn_params = {
     'account' : 'BL35257-VERISURE',
@@ -46,6 +45,7 @@ def db_insert(conn_params,private_key_file,site,dataset):
         con.close()
 
 # Read and format naemon.log file
+#
 def naemon_log(logfile):
     del naemon_arr[:]
     naelog=open(logfile,'r')
@@ -59,7 +59,7 @@ def naemon_log(logfile):
                 host=data[0]
                 service="Host check"
                 data=";".join(data[1:])
-            #    print(epoch," ".join(status),host, service, data)
+            #   dd print(epoch," ".join(status),host, service, data)
                 naemon_arr.append([epoch," ".join(status),host,service,data])
             elif status[0] == 'SERVICE' or status[1] == 'SERVICE':
                 data=":".join(data_line).split(";")
@@ -103,6 +103,7 @@ def naemon_log(logfile):
     return naemon_arr
 
 # Read and format notifications.log file
+#
 def notifications_log(logfile):
     del notifications_arr[:]
     notlog=open(logfile,'r')
@@ -114,18 +115,64 @@ def notifications_log(logfile):
         notifications_arr.append([date,time,data])
     return notifications_arr
 
-if __name__ == "__main__":
-    site=socket.gethostname().split("-")[0]
-    print (site)
-    site="nldc1"
-    naemon_log(nldc1_naemon_log_file)
-    notifications_log(nldc1_notifications_log_file)
-    print(site,len(naemon_arr),len(notifications_arr))
-    #db_insert(conn_params,private_key_file,site,notifications_arr)
-    site="segum"
-    naemon_log(segum_naemon_log_file)
-    notifications_log(segum_notifications_log_file)
-    print(site,len(naemon_arr),len(notifications_arr))
-    #db_insert(conn_params,private_key_file,site,notifications_arr)
+# Get date of last log rotation in Snowflake
+#
+def get_date():
+    global last_rotation
+    try:
+       con = sc.connect(**conn_params)
+       cs = con.cursor()
+       command=("SELECT * FROM retention;")
+       cs.execute(command)
+       last_rotation=cs.fetchone()[0]
+    except BaseException as e:
+        print ("There's been a problem with DB connection with following system message: \n", e)
+    finally:
+        con.close()
+    return last_rotation
 
+# Count and return delta in days between today and last cleaning - log rotation in Snowflake
+#
+def retention_delta():
+    delta=datetime.now() - datetime.strptime(get_date(), "%Y-%m-%d")
+    print(delta.days)
+    return delta.days
+
+# Clean log tables and set todays date in retention table
+#
+def db_clean(date):
+    try:
+       con = sc.connect(**conn_params)
+       cs = con.cursor()
+       commands=("TRUNCATE TABLE nldc1_naemon_log;" ,
+                 "TRUNCATE TABLE nldc1_naemon_log;" ,
+                 "TRUNCATE TABLE nldc1_notifications_log;" ,
+                 "TRUNCATE TABLE segum_notifications_log;" ,
+                 "UPDATE retention SET insert_date='{0}';".format(date))
+       for command in commands:
+            cs.execute(command)
+    except BaseException as e:
+        print ("There's been a problem with DB connection with following system message: \n", e)
+    finally:
+        con.close()
+
+
+if __name__ == "__main__":
+    #site=socket.gethostname().split("-")[0]
+    if retention_delta() > 30:
+        print (date.today())
+        db_clean(date.today())
+
+    site="nldc1"
+    naemon_log(naemon_log_file)
+    notifications_log(notifications_log_file)
+    print(site,len(naemon_arr),len(notifications_arr))
+    #db_insert(conn_params,private_key_file,site,notifications_arr)
     #db_insert(conn_params,private_key_file,site,naemon_arr)
+    site="segum"
+    naemon_log(naemon_log_file)
+    notifications_log(notifications_log_file)
+    print(site,len(naemon_arr),len(notifications_arr))
+    #db_insert(conn_params,private_key_file,site,notifications_arr)
+    #db_insert(conn_params,private_key_file,site,naemon_arr)
+   
